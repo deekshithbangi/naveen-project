@@ -1,0 +1,111 @@
+stages:
+  - sast
+  - sca
+  - iac
+  - container
+
+variables:
+  DOCKER_DRIVER: overlay2
+  # Fail the job (but not the pipeline) on findings; adjust to 'true' to hard-fail
+  ALLOW_FAILURE: "true"
+
+.sast_base:
+  image: sonarsource/sonar-scanner-cli:5.0.1
+  stage: sast
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH
+  script:
+    - sonar-scanner -Dsonar.projectKey="$CI_PROJECT_PATH" \
+        -Dsonar.projectBaseDir=. \
+        -Dsonar.sources=. \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.login=$SONAR_TOKEN
+  allow_failure: $ALLOW_FAILURE == "true"
+  artifacts:
+    when: always
+    reports:
+      junit: sonar-reports/*.xml
+    paths:
+      - .scannerwork/
+
+.sca_base:
+  image: owasp/dependency-check:latest
+  stage: sca
+  variables:
+    DATA_DIR: "$CI_PROJECT_DIR/.depcheck-data"
+  before_script:
+    - mkdir -p "$CI_PROJECT_DIR/dependency-check-report" "$DATA_DIR"
+  script:
+    - |
+      dependency-check.sh \
+        --format "ALL" \
+        --scan "$CI_PROJECT_DIR" \
+        --out "$CI_PROJECT_DIR/dependency-check-report" \
+        --data "$DATA_DIR" \
+        --noupdate
+  allow_failure: $ALLOW_FAILURE == "true"
+  artifacts:
+    when: always
+    paths:
+      - dependency-check-report/
+
+.iac_checkov:
+  image: bridgecrew/checkov:latest
+  stage: iac
+  rules:
+    - changes:
+        - '**/*.tf'
+        - '**/*.yaml'
+        - '**/*.yml'
+  script:
+    - checkov -d . -o junitxml > checkov-report.xml || true
+  allow_failure: $ALLOW_FAILURE == "true"
+  artifacts:
+    when: always
+    reports:
+      junit: checkov-report.xml
+    paths:
+      - checkov-report.xml
+
+.iac_tflint:
+  image: ghcr.io/terraform-linters/tflint-bundle:latest
+  stage: iac
+  rules:
+    - changes:
+        - '**/*.tf'
+  script:
+    - tflint --recursive --format junit > tflint-report.xml || true
+  allow_failure: $ALLOW_FAILURE == "true"
+  artifacts:
+    when: always
+    reports:
+      junit: tflint-report.xml
+    paths:
+      - tflint-report.xml
+
+.container_trivy:
+  image: aquasec/trivy:latest
+  stage: container
+  rules:
+    - changes:
+        - 'Dockerfile'
+        - '**/Dockerfile'
+  script:
+    - trivy version
+    - |
+      if [ -f Dockerfile ]; then
+        trivy image --no-progress --format json --output trivy-image.json $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA || true
+      else
+        echo "No Dockerfile found, skipping image scan";
+      fi
+  allow_failure: $ALLOW_FAILURE == "true"
+  artifacts:
+    when: always
+    paths:
+      - trivy-image.json
+
+sast: { extends: .sast_base }
+sca: { extends: .sca_base }
+iac_checkov: { extends: .iac_checkov }
+iac_tflint: { extends: .iac_tflint }
+container_trivy: { extends: .container_trivy }
