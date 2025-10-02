@@ -25,15 +25,15 @@ jobs:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
 
+      - name: Install SonarScanner CLI
+        run: |
+          npm install -g sonarqube-scanner
+
       - name: SonarQube Scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          ./gradlew sonarqube \
-            -Dsonar.projectKey=${{ github.repository }} \
-            -Dsonar.host.url=$SONAR_HOST_URL \
-            -Dsonar.login=$SONAR_TOKEN || \
           sonar-scanner \
             -Dsonar.projectKey=${{ github.repository }} \
             -Dsonar.sources=. \
