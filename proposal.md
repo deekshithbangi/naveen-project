@@ -165,3 +165,14 @@ Appendix A: Pipeline skeleton and usage
 Appendix B: Gantt chart
 
 - See `docs/gantt.md` for a Mermaid Gantt chart visualizing project milestones and timelines.
+# Create volumes for persistence
+docker volume create sq-data
+docker volume create sq-extensions
+
+# Start SonarQube (Community Edition)
+docker run -d --name sonarqube \
+  -p 9000:9000 \
+  -e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true \
+  -v sq-data:/opt/sonarqube/data \
+  -v sq-extensions:/opt/sonarqube/extensions \
+  sonarqube:community
