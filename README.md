@@ -46,4 +46,7 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
 
 - Tune severity thresholds and failure behavior per stage to balance detection vs. developer experience.
 - Use caching and parallel stages in GitLab to minimize performance impact.
-- Expand with DAST or license compliance as needed for your stack.
+- Expand with DAST or license compliance as needed for your stack. 
+
+Done with stage - 1
+Starting stage - 2
